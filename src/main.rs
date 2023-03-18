@@ -1,66 +1,53 @@
-use goblin::{error, Object};
 use std::collections::HashSet;
-use std::env;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+use goblin::{error, Object};
+
+mod cli;
 mod extract;
 mod util;
 use util::fail;
 
-// fn getit<'a>(path: &Path) -> Result<goblin::mach::MachO<'a>, error::Error> {
-fn getit<'a>(buffer: &'a Vec<u8>) -> Result<goblin::mach::MachO<'a>, error::Error> {
-    // let buffer = fs::read(path.to_str().unwrap())?;
+fn getit<'a>(path: &Path, buffer: &'a Vec<u8>) -> Result<goblin::mach::MachO<'a>, error::Error> {
     match Object::parse(&buffer)? {
-        Object::Elf(elf) => {
-            fail("elf");
-        }
-        Object::PE(pe) => {
-            fail("PE");
-        }
-        Object::Mach(mach) => {
-            // println!("mach: {:#?}", &mach);
-            match mach {
-                goblin::mach::Mach::Fat(fat) => {
-                    for arch in fat.iter_arches() {
-                        let arch = arch.unwrap();
-                        // println!("here!: {:#?}", arch);
-
-                        let nested = goblin::mach::MachO::parse(&buffer, arch.offset as usize)?;
-                        return Ok(nested);
-                        // doit(nested)?;
-                        // println!("nested: {:#?} {:#?}", nested.libs, nested.rpaths);
-                        // // nested.libs
-                        // for a in nested.load_commands {
-                        //     if let goblin::mach::load_command::CommandVariant::LoadDylib(
-                        //         cmd,
-                        //     ) = a.command
-                        //     {
-                        //         println!("cmd: {:#?}", cmd.dylib.name);
-                        //     }
-                        //     // println!("a: {:#?}", a);
-                        // }
-
-                        // break;
-                    }
-
-                    fail("nope");
+        Object::Mach(mach) => match mach {
+            goblin::mach::Mach::Fat(fat) => {
+                for arch in fat.iter_arches() {
+                    return Ok(goblin::mach::MachO::parse(&buffer, arch?.offset as usize)?);
                 }
-                goblin::mach::Mach::Binary(binary) => {
-                    // println!("binary: {:#?}", binary);
-                    // fail("needed");
-                    return Ok(binary);
-                }
+
+                fail("nope");
             }
+            goblin::mach::Mach::Binary(binary) => {
+                return Ok(binary);
+            }
+        },
+        Object::Archive(_) => {
+            fail(format!(
+                "{}: error: archives are not currently supported",
+                path.to_string_lossy(),
+            ));
         }
-        Object::Archive(archive) => {
-            println!("archive: {:#?}", &archive);
-            fail("archive");
+        Object::Elf(_) => {
+            fail(format!(
+                "{}: error: ELF binaries are not currently supported, use lddtree instead",
+                path.to_string_lossy(),
+            ));
+        }
+        Object::PE(_) => {
+            fail(format!(
+                "{}: error: PE binaries are not currently supported",
+                path.to_string_lossy(),
+            ));
         }
         Object::Unknown(magic) => {
-            println!("unknown magic: {:#x}", magic);
-            fail("uknown");
+            fail(format!(
+                "{}: error: unknown file magic: {:#x}, please file an issue if this is a Mach-O file",
+                path.to_string_lossy(),
+                magic
+            ));
         }
     }
 }
@@ -125,16 +112,15 @@ fn doit(
     indent: usize,
     visited: &HashSet<String>,
     ignore_prefixes: &Vec<String>,
+    exclude_all_duplicates: bool,
 ) -> Result<HashSet<String>, error::Error> {
     let buffer = fs::read(bin_path).unwrap();
-    let nested = getit(&buffer).unwrap();
-    // println!("nested: {:#?} {:#?}", nested.libs, nested.rpaths);
-    // nested.libs
+    let binary = getit(bin_path, &buffer).unwrap();
 
-    let prefix = " ".repeat(indent);
-    // println!("{}{}:", prefix, canonical_path.to_str().unwrap());
+    println!("{}{}:", " ".repeat(indent), canonical_path);
+    let prefix = " ".repeat(indent + 2);
     let mut new_visited = visited.clone();
-    for lib in nested.libs {
+    for lib in binary.libs {
         // The LC_ID_DYLIB load command is contained in this list, so we need to skip the current
         // dylib to not get stuck in an infinite loop
         if lib == "self" || lib == canonical_path {
@@ -146,16 +132,17 @@ fn doit(
         }
 
         if visited.contains(&lib.to_owned()) {
-            println!("{}{}", prefix, lib); // TODO Configurable
+            if !exclude_all_duplicates {
+                println!("{}{}", prefix, lib);
+            }
             continue;
         }
 
         new_visited.insert(lib.to_owned());
 
         let mut found = false;
-        for path in get_potential_paths(shared_cache_root, &bin_path, &lib, &nested.rpaths) {
+        for path in get_potential_paths(shared_cache_root, &bin_path, &lib, &binary.rpaths) {
             if path.exists() {
-                println!("{}{}:", prefix, lib);
                 let nested_visit = doit(
                     shared_cache_root,
                     &path,
@@ -163,6 +150,7 @@ fn doit(
                     indent + 2,
                     &new_visited,
                     ignore_prefixes,
+                    exclude_all_duplicates,
                 )?;
                 new_visited.extend(nested_visit);
                 found = true;
@@ -179,26 +167,21 @@ fn doit(
 }
 
 fn main() -> Result<(), error::Error> {
+    let args = cli::parse_args();
     let target_path = Path::new("/tmp/testlibs2");
     if !target_path.exists() {
         extract::extract_libs(target_path);
     }
 
-    for (i, arg) in env::args().enumerate() {
-        if i == 1 {
-            let bin_path = Path::new(&arg);
-            let visited = HashSet::new();
-            println!("{}:", &arg);
-            doit(
-                target_path.to_str().unwrap(),
-                &bin_path,
-                &arg,
-                2,
-                &visited,
-                &vec![],
-                // &vec!["/usr/lib/swift".into(), "/System/Library".into()],
-            )?;
-        }
-    }
+    let visited = HashSet::new();
+    doit(
+        target_path.to_str().unwrap(),
+        &args.binary,
+        args.binary.to_str().unwrap(),
+        0,
+        &visited,
+        &args.ignore_prefixes,
+        args.exclude_all_duplicates,
+    )?;
     Ok(())
 }
