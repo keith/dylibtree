@@ -10,7 +10,10 @@ mod extract;
 mod util;
 use util::fail;
 
-fn getit<'a>(path: &Path, buffer: &'a Vec<u8>) -> Result<goblin::mach::MachO<'a>, error::Error> {
+fn load_binary<'a>(
+    path: &Path,
+    buffer: &'a Vec<u8>,
+) -> Result<goblin::mach::MachO<'a>, error::Error> {
     match Object::parse(&buffer)? {
         Object::Mach(mach) => match mach {
             goblin::mach::Mach::Fat(fat) => {
@@ -105,77 +108,76 @@ fn should_ignore(lib: &str, ignore_prefixes: &Vec<String>) -> bool {
     false
 }
 
-fn doit(
+fn print_dylib_paths(
     shared_cache_root: &str,
-    bin_path: &Path,
+    actual_path: &Path,
     canonical_path: &str,
     indent: usize,
     visited: &HashSet<String>,
     ignore_prefixes: &Vec<String>,
     exclude_all_duplicates: bool,
 ) -> Result<HashSet<String>, error::Error> {
-    let buffer = fs::read(bin_path).unwrap();
-    let binary = getit(bin_path, &buffer).unwrap();
+    let buffer = fs::read(actual_path).unwrap();
+    let binary = load_binary(actual_path, &buffer).unwrap();
 
     println!("{}{}:", " ".repeat(indent), canonical_path);
     let prefix = " ".repeat(indent + 2);
-    let mut new_visited = visited.clone();
-    for lib in binary.libs {
+    let mut visited = visited.clone();
+    for dylib in binary.libs {
         // The LC_ID_DYLIB load command is contained in this list, so we need to skip the current
         // dylib to not get stuck in an infinite loop
-        if lib == "self" || lib == canonical_path {
+        if dylib == "self" || dylib == canonical_path {
             continue;
         }
 
-        if should_ignore(&lib, ignore_prefixes) {
+        if should_ignore(&dylib, ignore_prefixes) {
             continue;
         }
 
-        if visited.contains(&lib.to_owned()) {
+        if visited.contains(&dylib.to_owned()) {
             if !exclude_all_duplicates {
-                println!("{}{}", prefix, lib);
+                println!("{}{}", prefix, dylib);
             }
             continue;
         }
 
-        new_visited.insert(lib.to_owned());
+        visited.insert(dylib.to_owned());
 
         let mut found = false;
-        for path in get_potential_paths(shared_cache_root, &bin_path, &lib, &binary.rpaths) {
+        for path in get_potential_paths(shared_cache_root, &actual_path, &dylib, &binary.rpaths) {
             if path.exists() {
-                let nested_visit = doit(
+                visited.extend(print_dylib_paths(
                     shared_cache_root,
                     &path,
-                    lib,
+                    dylib,
                     indent + 2,
-                    &new_visited,
+                    &visited,
                     ignore_prefixes,
                     exclude_all_duplicates,
-                )?;
-                new_visited.extend(nested_visit);
+                )?);
                 found = true;
                 break;
             }
         }
 
         if !found {
-            println!("{}{}: warning: not found", prefix, lib);
+            println!("{}{}: warning: not found", prefix, dylib);
         }
     }
 
-    Ok(new_visited)
+    Ok(visited)
 }
 
 fn main() -> Result<(), error::Error> {
     let args = cli::parse_args();
-    let target_path = Path::new("/tmp/testlibs2");
-    if !target_path.exists() {
-        extract::extract_libs(target_path);
+    let shared_cache_root = Path::new("/tmp/testlibs2");
+    if !shared_cache_root.exists() {
+        extract::extract_libs(shared_cache_root);
     }
 
     let visited = HashSet::new();
-    doit(
-        target_path.to_str().unwrap(),
+    print_dylib_paths(
+        shared_cache_root.to_str().unwrap(),
         &args.binary,
         args.binary.to_str().unwrap(),
         0,
