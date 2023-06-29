@@ -4,7 +4,7 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 
-use crate::util;
+use crate::failf;
 
 pub fn extract_libs(target_path: &Path) {
     let library_path = get_library_path();
@@ -32,16 +32,16 @@ fn get_library_path() -> PathBuf {
         path.push("usr/lib/dsc_extractor.bundle");
 
         if !path.exists() {
-            util::fail(format!(
-            "error: dsc_extractor.bundle wasn't found at expected path, Xcode might have changed this location: {}",
-            path.to_str().unwrap()
-        ));
+            failf!(
+                "error: dsc_extractor.bundle wasn't found at expected path, Xcode might have changed this location: {}, please file an issue",
+                path.to_str().unwrap()
+            );
         }
 
         dbg!(&path);
         path
     } else {
-        util::fail("error: failed to fetch platform path from xcrun")
+        failf!("error: failed to fetch platform path from xcrun")
     }
 }
 

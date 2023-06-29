@@ -7,8 +7,8 @@ use goblin::{error, Object};
 
 mod cli;
 mod extract;
+#[macro_use]
 mod util;
-use util::fail;
 
 fn load_binary<'a>(
     path: &Path,
@@ -21,36 +21,36 @@ fn load_binary<'a>(
                     return Ok(goblin::mach::MachO::parse(&buffer, arch?.offset as usize)?);
                 }
 
-                fail("nope");
+                failf!("nope");
             }
             goblin::mach::Mach::Binary(binary) => {
                 return Ok(binary);
             }
         },
         Object::Archive(_) => {
-            fail(format!(
+            failf!(
                 "{}: error: archives are not currently supported",
                 path.to_string_lossy(),
-            ));
+            );
         }
         Object::Elf(_) => {
-            fail(format!(
+            failf!(
                 "{}: error: ELF binaries are not currently supported, use lddtree instead",
                 path.to_string_lossy(),
-            ));
+            );
         }
         Object::PE(_) => {
-            fail(format!(
+            failf!(
                 "{}: error: PE binaries are not currently supported",
                 path.to_string_lossy(),
-            ));
+            );
         }
         Object::Unknown(magic) => {
-            fail(format!(
+            failf!(
                 "{}: error: unknown file magic: {:#x}, please file an issue if this is a Mach-O file",
                 path.to_string_lossy(),
-                magic
-            ));
+                magic,
+            );
         }
     }
 }
