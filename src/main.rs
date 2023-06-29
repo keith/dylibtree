@@ -21,7 +21,10 @@ fn load_binary<'a>(
                     return Ok(goblin::mach::MachO::parse(&buffer, arch?.offset as usize)?);
                 }
 
-                failf!("nope");
+                failf!(
+                    "{}: error: no architectures found in fat binary, please file an issue if this is a valid Mach-O file",
+                    path.to_string_lossy(),
+                );
             }
             goblin::mach::Mach::Binary(binary) => {
                 return Ok(binary);
