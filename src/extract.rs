@@ -8,14 +8,14 @@ use crate::failf;
 
 pub fn extract_libs(target_path: &Path) {
     let library_path = get_library_path();
-    let input_path = path_to_cstring2(Path::new(
+    let input_path = path_to_cstring(Path::new(
         "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e",
     ));
-    let input_path = path_to_cstring2(Path::new(
+    let input_path = path_to_cstring(Path::new(
             "/Users/ksmiley/Library/Developer/Xcode/iOS DeviceSupport/16.4 (20E5212f) arm64e/Symbols/private/preboot/Cryptexes/OS/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e"
     ));
 
-    let output_path = path_to_cstring2(target_path);
+    let output_path = path_to_cstring(target_path);
 
     extract_shared_cache(library_path, input_path, output_path);
 }
@@ -38,14 +38,13 @@ fn get_library_path() -> PathBuf {
             );
         }
 
-        dbg!(&path);
         path
     } else {
         failf!("error: failed to fetch platform path from xcrun")
     }
 }
 
-fn path_to_cstring2(path: &Path) -> CString {
+fn path_to_cstring(path: &Path) -> CString {
     use std::os::unix::ffi::OsStrExt;
     CString::new(path.as_os_str().as_bytes()).unwrap()
 }
