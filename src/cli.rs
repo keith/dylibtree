@@ -26,6 +26,10 @@ pub struct Args {
     /// platform the binary was built for.
     #[arg(short, long)]
     pub shared_cache_path: Option<PathBuf>,
+
+    /// Print verbose output for debugging dylibtree itself
+    #[arg(long, default_value_t = false, hide = true)]
+    pub verbose: bool,
 }
 
 pub fn parse_args() -> Args {

@@ -110,6 +110,16 @@ fn should_ignore(lib: &str, ignore_prefixes: &Vec<String>) -> bool {
     false
 }
 
+fn is_system_dependency(lib: &str) -> bool {
+    for prefix in ["/usr/lib/", "/System"] {
+        if lib.starts_with(prefix) {
+            return true;
+        }
+    }
+
+    false
+}
+
 fn print_dylib_paths(
     shared_cache_root: &Option<PathBuf>,
     actual_path: &Path,
@@ -118,6 +128,8 @@ fn print_dylib_paths(
     visited: &HashSet<String>,
     ignore_prefixes: &Vec<String>,
     exclude_all_duplicates: bool,
+    include_system_dependencies: bool,
+    verbose: bool,
 ) -> Result<HashSet<String>, error::Error> {
     let buffer = fs::read(actual_path).unwrap();
     let binary = load_binary(actual_path, &buffer).unwrap();
@@ -133,6 +145,12 @@ fn print_dylib_paths(
         }
 
         if should_ignore(dylib, ignore_prefixes) {
+            verbose_log!(verbose, "Ignoring prefix: {}", dylib);
+            continue;
+        }
+
+        if include_system_dependencies && is_system_dependency(dylib) {
+            verbose_log!(verbose, "Ignoring system dependency: {}", dylib);
             continue;
         }
 
@@ -147,7 +165,9 @@ fn print_dylib_paths(
 
         let mut found = false;
         for path in get_potential_paths(shared_cache_root, actual_path, dylib, &binary.rpaths) {
+            verbose_log!(verbose, "Checking path: {:?}", path);
             if path.exists() {
+                verbose_log!(verbose, "Found path: {:?}", path);
                 visited.extend(print_dylib_paths(
                     shared_cache_root,
                     &path,
@@ -156,6 +176,8 @@ fn print_dylib_paths(
                     &visited,
                     ignore_prefixes,
                     exclude_all_duplicates,
+                    include_system_dependencies,
+                    verbose,
                 )?);
                 found = true;
                 break;
@@ -186,6 +208,8 @@ fn main() -> Result<(), error::Error> {
         &visited,
         &args.ignore_prefixes,
         args.exclude_all_duplicates,
+        args.include_system_dependencies,
+        args.verbose,
     )?;
     Ok(())
 }
