@@ -54,7 +54,7 @@ pub fn extract_libs(shared_cache_path: Option<PathBuf>) -> PathBuf {
         failf!("error: failed to extract shared cache, see above for the error from dyld")
     }
 
-    return output_path;
+    output_path
 }
 
 fn get_extractor_path() -> PathBuf {
@@ -111,10 +111,10 @@ fn extract_shared_cache(
         > = library
             .get(b"dyld_shared_cache_extract_dylibs_progress")
             .unwrap();
-        return func(
+        func(
             path_to_cstring(shared_cache_path).as_ptr(),
             path_to_cstring(output_path).as_ptr(),
             &progress_block,
-        ) == 0;
+        ) == 0
     }
 }

@@ -10,15 +10,12 @@ mod extract;
 #[macro_use]
 mod util;
 
-fn load_binary<'a>(
-    path: &Path,
-    buffer: &'a Vec<u8>,
-) -> Result<goblin::mach::MachO<'a>, error::Error> {
-    match Object::parse(&buffer)? {
+fn load_binary<'a>(path: &Path, buffer: &'a [u8]) -> Result<goblin::mach::MachO<'a>, error::Error> {
+    match Object::parse(buffer)? {
         Object::Mach(mach) => match mach {
             goblin::mach::Mach::Fat(fat) => {
-                for arch in fat.iter_arches() {
-                    return Ok(goblin::mach::MachO::parse(&buffer, arch?.offset as usize)?);
+                if let Some(arch) = fat.iter_arches().next() {
+                    return goblin::mach::MachO::parse(buffer, arch?.offset as usize);
                 }
 
                 failf!(
@@ -26,9 +23,7 @@ fn load_binary<'a>(
                     path.to_string_lossy(),
                 );
             }
-            goblin::mach::Mach::Binary(binary) => {
-                return Ok(binary);
-            }
+            goblin::mach::Mach::Binary(binary) => Ok(binary),
         },
         Object::Archive(_) => {
             failf!(
@@ -67,27 +62,27 @@ fn get_potential_paths(
     let mut paths = vec![];
 
     if lib.starts_with("@rpath/") {
-        let lib = lib.splitn(2, "/").nth(1).unwrap();
+        let lib = lib.split_once('/').unwrap().1;
         for rpath in rpaths {
             // TODO: @loader_path/ isn't right here, but this is better than nothing for now
             if rpath.starts_with("@executable_path/") || rpath.starts_with("@loader_path/") {
-                let rpath = rpath.splitn(2, "/").nth(1).unwrap();
+                let rpath = rpath.split_once('/').unwrap().1;
                 let mut path = PathBuf::from(executable_path.parent().unwrap());
-                path.push(&rpath);
-                path.push(&lib);
+                path.push(rpath);
+                path.push(lib);
                 paths.push(path);
                 continue;
             }
 
             let mut path = PathBuf::from(rpath);
-            path.push(&lib);
+            path.push(lib);
             paths.push(path);
 
             if let Some(shared_cache_root) = &shared_cache_root {
                 let mut path = PathBuf::from(shared_cache_root);
-                let rpath = rpath.strip_prefix("/").unwrap();
+                let rpath = rpath.strip_prefix('/').unwrap();
                 path.push(rpath);
-                path.push(&lib);
+                path.push(lib);
                 paths.push(path);
             }
         }
@@ -96,7 +91,7 @@ fn get_potential_paths(
 
         if let Some(shared_cache_root) = &shared_cache_root {
             let mut path = PathBuf::from(shared_cache_root);
-            let lib = lib.strip_prefix("/").unwrap();
+            let lib = lib.strip_prefix('/').unwrap();
             path.push(lib);
             paths.push(path);
         }
@@ -137,7 +132,7 @@ fn print_dylib_paths(
             continue;
         }
 
-        if should_ignore(&dylib, ignore_prefixes) {
+        if should_ignore(dylib, ignore_prefixes) {
             continue;
         }
 
@@ -151,7 +146,7 @@ fn print_dylib_paths(
         visited.insert(dylib.to_owned());
 
         let mut found = false;
-        for path in get_potential_paths(&shared_cache_root, &actual_path, &dylib, &binary.rpaths) {
+        for path in get_potential_paths(shared_cache_root, actual_path, dylib, &binary.rpaths) {
             if path.exists() {
                 visited.extend(print_dylib_paths(
                     shared_cache_root,

@@ -29,5 +29,5 @@ pub struct Args {
 }
 
 pub fn parse_args() -> Args {
-    return Args::parse();
+    Args::parse()
 }
