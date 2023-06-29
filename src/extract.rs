@@ -1,21 +1,60 @@
 use block::{Block, ConcreteBlock};
 use libloading::{Library, Symbol};
+use std::collections::hash_map::DefaultHasher;
 use std::ffi::CString;
+use std::hash::{Hash, Hasher};
 use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 
 use crate::failf;
 
-pub fn extract_libs(output_path: &Path) {
-    let extractor_path = get_extractor_path();
-    let shared_cache_path = Path::new(
-        "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e",
-    );
-    let shared_cache_path = Path::new(
-            "/Users/ksmiley/Library/Developer/Xcode/iOS DeviceSupport/16.4 (20E5212f) arm64e/Symbols/private/preboot/Cryptexes/OS/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e"
-    );
+pub fn extract_libs(shared_cache_path: Option<PathBuf>) -> PathBuf {
+    if let Some(shared_cache_path) = &shared_cache_path {
+        if !shared_cache_path.exists() {
+            failf!(
+                "error: passed shared cache path doesn't exist: {}",
+                shared_cache_path.to_string_lossy()
+            );
+        }
+    }
 
-    extract_shared_cache(extractor_path, shared_cache_path, output_path);
+    let potential_paths = vec![
+        shared_cache_path,
+        Some(Path::new(
+            "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e",
+        ).to_path_buf()),
+        Some(Path::new(
+            "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64h",
+        ).to_path_buf()),
+    ];
+
+    let shared_cache_path = potential_paths
+        .into_iter()
+        .flatten()
+        .find(|path| path.exists())
+        .unwrap_or_else(|| {
+            failf!(
+                "error: failed to find shared cache, please provide the path with --shared-cache-path and file an issue so we can add the new path"
+            )
+        });
+
+    let mut output_path = PathBuf::from("/tmp/dylibtree");
+    let mut hasher = DefaultHasher::new();
+    shared_cache_path.hash(&mut hasher);
+    let hash_str = format!("{:x}", hasher.finish());
+    output_path.push(hash_str);
+
+    if output_path.exists() {
+        return output_path;
+    }
+
+    let success = extract_shared_cache(get_extractor_path(), &shared_cache_path, &output_path);
+    if !success {
+        _ = std::fs::remove_dir_all(output_path);
+        failf!("error: failed to extract shared cache, see above for the error from dyld")
+    }
+
+    return output_path;
 }
 
 fn get_extractor_path() -> PathBuf {
@@ -47,7 +86,11 @@ fn path_to_cstring(path: &Path) -> CString {
     CString::new(path.as_os_str().as_bytes()).unwrap()
 }
 
-fn extract_shared_cache(extractor_path: PathBuf, shared_cache_path: &Path, output_path: &Path) {
+fn extract_shared_cache(
+    extractor_path: PathBuf,
+    shared_cache_path: &Path,
+    output_path: &Path,
+) -> bool {
     if !shared_cache_path.exists() {
         failf!(
             "error: shared cache doesn't exist at path: {}",
@@ -56,6 +99,7 @@ fn extract_shared_cache(extractor_path: PathBuf, shared_cache_path: &Path, outpu
     }
 
     let progress_block = ConcreteBlock::new(|x, y| eprintln!("extracted {}/{}", x, y));
+
     unsafe {
         let library = Library::new(extractor_path).unwrap();
         let func: Symbol<
@@ -63,14 +107,14 @@ fn extract_shared_cache(extractor_path: PathBuf, shared_cache_path: &Path, outpu
                 shared_cache_path: *const c_char,
                 output_path: *const c_char,
                 progress: &Block<(usize, usize), ()>,
-            ),
+            ) -> i32,
         > = library
             .get(b"dyld_shared_cache_extract_dylibs_progress")
             .unwrap();
-        func(
+        return func(
             path_to_cstring(shared_cache_path).as_ptr(),
             path_to_cstring(output_path).as_ptr(),
             &progress_block,
-        );
+        ) == 0;
     }
 }

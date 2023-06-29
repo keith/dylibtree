@@ -59,7 +59,7 @@ fn load_binary<'a>(
 }
 
 fn get_potential_paths(
-    shared_cache_root: &str,
+    shared_cache_root: &Option<PathBuf>,
     executable_path: &Path,
     lib: &str,
     rpaths: &Vec<&str>,
@@ -83,19 +83,23 @@ fn get_potential_paths(
             path.push(&lib);
             paths.push(path);
 
-            let mut path = PathBuf::from(shared_cache_root);
-            let rpath = rpath.strip_prefix("/").unwrap();
-            path.push(rpath);
-            path.push(&lib);
-            paths.push(path);
+            if let Some(shared_cache_root) = &shared_cache_root {
+                let mut path = PathBuf::from(shared_cache_root);
+                let rpath = rpath.strip_prefix("/").unwrap();
+                path.push(rpath);
+                path.push(&lib);
+                paths.push(path);
+            }
         }
     } else {
         paths.push(Path::new(lib).to_path_buf());
 
-        let mut path = PathBuf::from(shared_cache_root);
-        let lib = lib.strip_prefix("/").unwrap();
-        path.push(lib);
-        paths.push(path);
+        if let Some(shared_cache_root) = &shared_cache_root {
+            let mut path = PathBuf::from(shared_cache_root);
+            let lib = lib.strip_prefix("/").unwrap();
+            path.push(lib);
+            paths.push(path);
+        }
     }
 
     paths
@@ -112,7 +116,7 @@ fn should_ignore(lib: &str, ignore_prefixes: &Vec<String>) -> bool {
 }
 
 fn print_dylib_paths(
-    shared_cache_root: &str,
+    shared_cache_root: &Option<PathBuf>,
     actual_path: &Path,
     canonical_path: &str,
     indent: usize,
@@ -147,7 +151,7 @@ fn print_dylib_paths(
         visited.insert(dylib.to_owned());
 
         let mut found = false;
-        for path in get_potential_paths(shared_cache_root, &actual_path, &dylib, &binary.rpaths) {
+        for path in get_potential_paths(&shared_cache_root, &actual_path, &dylib, &binary.rpaths) {
             if path.exists() {
                 visited.extend(print_dylib_paths(
                     shared_cache_root,
@@ -173,14 +177,14 @@ fn print_dylib_paths(
 
 fn main() -> Result<(), error::Error> {
     let args = cli::parse_args();
-    let shared_cache_root = Path::new("/tmp/testlibs2");
-    if !shared_cache_root.exists() {
-        extract::extract_libs(shared_cache_root);
+    let mut extracted_cache_path: Option<PathBuf> = None;
+    if args.include_system_dependencies {
+        extracted_cache_path = Some(extract::extract_libs(args.shared_cache_path));
     }
 
     let visited = HashSet::new();
     print_dylib_paths(
-        shared_cache_root.to_str().unwrap(),
+        &extracted_cache_path,
         &args.binary,
         args.binary.to_str().unwrap(),
         0,
