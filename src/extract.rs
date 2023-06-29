@@ -6,21 +6,19 @@ use std::path::{Path, PathBuf};
 
 use crate::failf;
 
-pub fn extract_libs(target_path: &Path) {
-    let library_path = get_library_path();
-    let input_path = path_to_cstring(Path::new(
+pub fn extract_libs(output_path: &Path) {
+    let extractor_path = get_extractor_path();
+    let shared_cache_path = Path::new(
         "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e",
-    ));
-    let input_path = path_to_cstring(Path::new(
+    );
+    let shared_cache_path = Path::new(
             "/Users/ksmiley/Library/Developer/Xcode/iOS DeviceSupport/16.4 (20E5212f) arm64e/Symbols/private/preboot/Cryptexes/OS/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e"
-    ));
+    );
 
-    let output_path = path_to_cstring(target_path);
-
-    extract_shared_cache(library_path, input_path, output_path);
+    extract_shared_cache(extractor_path, shared_cache_path, output_path);
 }
 
-fn get_library_path() -> PathBuf {
+fn get_extractor_path() -> PathBuf {
     let output = std::process::Command::new("xcrun")
         .arg("--sdk")
         .arg("iphoneos")
@@ -49,19 +47,30 @@ fn path_to_cstring(path: &Path) -> CString {
     CString::new(path.as_os_str().as_bytes()).unwrap()
 }
 
-fn extract_shared_cache(library_path: PathBuf, input_path: CString, output_path: CString) {
-    let progress_block = ConcreteBlock::new(|x, y| println!("extracted {}/{}", x, y));
+fn extract_shared_cache(extractor_path: PathBuf, shared_cache_path: &Path, output_path: &Path) {
+    if !shared_cache_path.exists() {
+        failf!(
+            "error: shared cache doesn't exist at path: {}",
+            shared_cache_path.to_str().unwrap()
+        );
+    }
+
+    let progress_block = ConcreteBlock::new(|x, y| eprintln!("extracted {}/{}", x, y));
     unsafe {
-        let library = Library::new(library_path).unwrap();
+        let library = Library::new(extractor_path).unwrap();
         let func: Symbol<
             unsafe extern "C" fn(
-                input_path: *const c_char,
+                shared_cache_path: *const c_char,
                 output_path: *const c_char,
                 progress: &Block<(usize, usize), ()>,
             ),
         > = library
             .get(b"dyld_shared_cache_extract_dylibs_progress")
             .unwrap();
-        func(input_path.as_ptr(), output_path.as_ptr(), &progress_block);
+        func(
+            path_to_cstring(shared_cache_path).as_ptr(),
+            path_to_cstring(output_path).as_ptr(),
+            &progress_block,
+        );
     }
 }
