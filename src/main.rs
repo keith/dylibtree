@@ -7,7 +7,7 @@ use goblin::mach::load_command;
 use goblin::{error, Object};
 
 mod cli;
-mod extract;
+mod dyld_shared_cache;
 #[macro_use]
 mod util;
 
@@ -254,7 +254,7 @@ fn runtime_root_for_binary(binary_path: &Path, verbose: bool) -> Result<PathBuf,
                         Path::new("/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e").to_path_buf(),
                         Path::new("/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64h").to_path_buf(),
                     ];
-                    Ok(extract::extract_libs(potential_paths, verbose))
+                    Ok(dyld_shared_cache::extract_libs(potential_paths, verbose))
                 }
                 load_command::PLATFORM_IOS => Ok(newest_device_path("iOS")),
                 load_command::PLATFORM_IOSSIMULATOR => Ok(newest_simulator_path("iOS")),
@@ -286,7 +286,7 @@ fn main() -> Result<(), error::Error> {
                 path.to_string_lossy()
             );
         }
-        extract::extract_libs(vec![path], args.verbose)
+        dyld_shared_cache::extract_libs(vec![path], args.verbose)
     } else {
         runtime_root_for_binary(&args.binary, args.verbose)?
     };
