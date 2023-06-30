@@ -9,30 +9,9 @@ use std::path::{Path, PathBuf};
 use crate::failf;
 use crate::verbose_log;
 
-// TODO: hoist paths
-pub fn extract_libs(shared_cache_path: &Option<PathBuf>, verbose: bool) -> PathBuf {
-    if let Some(shared_cache_path) = &shared_cache_path {
-        if !shared_cache_path.exists() {
-            failf!(
-                "error: passed shared cache path doesn't exist: {}",
-                shared_cache_path.to_string_lossy()
-            );
-        }
-    }
-
-    let potential_paths = vec![
-        shared_cache_path.to_owned(),
-        Some(Path::new(
-            "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e",
-        ).to_path_buf()),
-        Some(Path::new(
-            "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64h",
-        ).to_path_buf()),
-    ];
-
+pub fn extract_libs(potential_paths: Vec<PathBuf>, verbose: bool) -> PathBuf {
     let shared_cache_path = potential_paths
         .into_iter()
-        .flatten()
         .find(|path| path.exists())
         .unwrap_or_else(|| {
             failf!(
@@ -52,7 +31,16 @@ pub fn extract_libs(shared_cache_path: &Option<PathBuf>, verbose: bool) -> PathB
         return output_path;
     }
 
-    let success = extract_shared_cache(get_extractor_path(), &shared_cache_path, &output_path);
+    eprintln!(
+        "note: extracting shared cache to: {}, this will only have to be done once",
+        output_path.display(),
+    );
+    let success = extract_shared_cache(
+        get_extractor_path(),
+        &shared_cache_path,
+        &output_path,
+        verbose,
+    );
     if !success {
         _ = std::fs::remove_dir_all(output_path);
         failf!("error: failed to extract shared cache, see above for the error from dyld")
@@ -94,6 +82,7 @@ fn extract_shared_cache(
     extractor_path: PathBuf,
     shared_cache_path: &Path,
     output_path: &Path,
+    verbose: bool,
 ) -> bool {
     if !shared_cache_path.exists() {
         failf!(
@@ -102,7 +91,7 @@ fn extract_shared_cache(
         );
     }
 
-    let progress_block = ConcreteBlock::new(|x, y| eprintln!("extracted {}/{}", x, y));
+    let progress_block = ConcreteBlock::new(|x, y| verbose_log!(verbose, "extracted {}/{}", x, y));
 
     unsafe {
         let library = Library::new(extractor_path).unwrap();

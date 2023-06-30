@@ -249,7 +249,13 @@ fn runtime_root_for_binary(binary_path: &Path, verbose: bool) -> Result<PathBuf,
     for lc in initial_binary.load_commands {
         if let load_command::CommandVariant::BuildVersion(version) = lc.command {
             return match version.platform {
-                load_command::PLATFORM_MACOS => Ok(extract::extract_libs(&None, verbose)),
+                load_command::PLATFORM_MACOS => {
+                    let potential_paths = vec![
+                        Path::new("/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e").to_path_buf(),
+                        Path::new("/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64h").to_path_buf(),
+                    ];
+                    Ok(extract::extract_libs(potential_paths, verbose))
+                }
                 load_command::PLATFORM_IOS => Ok(newest_device_path("iOS")),
                 load_command::PLATFORM_IOSSIMULATOR => Ok(newest_simulator_path("iOS")),
                 load_command::PLATFORM_TVOSSIMULATOR => Ok(newest_simulator_path("tvOS")),
@@ -274,7 +280,13 @@ fn main() -> Result<(), error::Error> {
     let runtime_root = if let Some(path) = args.runtime_root {
         path
     } else if let Some(path) = args.shared_cache_path {
-        extract::extract_libs(&Some(path), args.verbose)
+        if !path.exists() {
+            failf!(
+                "error: passed shared cache path doesn't exist: {}",
+                path.to_string_lossy()
+            );
+        }
+        extract::extract_libs(vec![path], args.verbose)
     } else {
         runtime_root_for_binary(&args.binary, args.verbose)?
     };
