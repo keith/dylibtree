@@ -209,7 +209,21 @@ fn main() -> Result<(), error::Error> {
     let args = cli::parse_args();
     let mut extracted_cache_path: Option<PathBuf> = None;
     if args.include_system_dependencies {
-        extracted_cache_path = Some(extract::extract_libs(args.shared_cache_path, args.verbose));
+        extracted_cache_path = Some(extract::extract_libs(&args.shared_cache_path, args.verbose));
+    }
+
+    if args.shared_cache_path == None && args.include_system_dependencies {
+        let buffer = &fs::read(&args.binary)?;
+        let initial_binary = load_binary(&args.binary, buffer)?;
+
+        for lc in initial_binary.load_commands {
+            if let goblin::mach::load_command::CommandVariant::BuildVersion(version) = lc.command {
+                if version.platform != goblin::mach::load_command::PLATFORM_MACOS {
+                    eprintln!("warning: binary is not built for macOS but --shared-cache-path is not specified, so system dependencies may be invalid.");
+                }
+                break;
+            }
+        }
     }
 
     let visited = HashSet::new();

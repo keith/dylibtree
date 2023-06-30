@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use crate::failf;
 use crate::verbose_log;
 
-pub fn extract_libs(shared_cache_path: Option<PathBuf>, verbose: bool) -> PathBuf {
+pub fn extract_libs(shared_cache_path: &Option<PathBuf>, verbose: bool) -> PathBuf {
     if let Some(shared_cache_path) = &shared_cache_path {
         if !shared_cache_path.exists() {
             failf!(
@@ -20,7 +20,7 @@ pub fn extract_libs(shared_cache_path: Option<PathBuf>, verbose: bool) -> PathBu
     }
 
     let potential_paths = vec![
-        shared_cache_path,
+        shared_cache_path.to_owned(),
         Some(Path::new(
             "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e",
         ).to_path_buf()),
