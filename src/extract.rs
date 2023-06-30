@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use crate::failf;
 use crate::verbose_log;
 
+// TODO: hoist paths
 pub fn extract_libs(shared_cache_path: &Option<PathBuf>, verbose: bool) -> PathBuf {
     if let Some(shared_cache_path) = &shared_cache_path {
         if !shared_cache_path.exists() {

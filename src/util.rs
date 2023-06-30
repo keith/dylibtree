@@ -12,12 +12,12 @@ macro_rules! failf {
 
 #[macro_export]
 macro_rules! verbose_log {
-    ($verbose:ident, $format_string:expr) => {{
+    ($verbose:expr, $format_string:expr) => {{
         if $verbose {
             eprintln!("VERBOSE: {}", $format_string);
         }
     }};
-    ($verbose:ident, $format_string:expr, $($arg:expr),* $(,)?) => {{
+    ($verbose:expr, $format_string:expr, $($arg:expr),* $(,)?) => {{
         if $verbose {
             eprintln!("VERBOSE: {}", format!($format_string, $($arg),*));
         }

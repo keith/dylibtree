@@ -22,10 +22,14 @@ pub struct Args {
     #[arg(short = 'p', long, value_name = "PREFIX")]
     pub ignore_prefixes: Vec<String>,
 
-    /// Path to the shared cache, if not provided default to the systems, regardless of what
-    /// platform the binary was built for.
+    /// Path to the shared cache, if not provided try to discover it.
     #[arg(short, long)]
     pub shared_cache_path: Option<PathBuf>,
+
+    /// Path to the a device or simulators root runtime directory containing the dylibs for
+    /// the OS, if not provided try to discover it.
+    #[arg(short, long)]
+    pub runtime_root: Option<PathBuf>,
 
     /// The maximum depth of libraries to print. Reduce to reduce output
     #[arg(short, long, default_value_t = 9999)]
