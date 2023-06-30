@@ -53,6 +53,18 @@ fn load_binary<'a>(path: &Path, buffer: &'a [u8]) -> Result<goblin::mach::MachO<
     }
 }
 
+fn versioned_path(prefix: Option<PathBuf>, lib: &str, version: &str) -> PathBuf {
+    let re = regex::Regex::new(r#"[^/]+\.framework/"#).unwrap();
+    let framework_with_version = re.replace_all(lib, format!("${{0}}Versions/{}/", version));
+    if let Some(prefix) = &prefix {
+        let mut path = prefix.clone();
+        path.push(framework_with_version.strip_prefix('/').unwrap());
+        return path;
+    }
+
+    Path::new(framework_with_version.as_ref()).to_path_buf()
+}
+
 fn get_potential_paths(
     shared_cache_root: &Option<PathBuf>,
     executable_path: &Path,
@@ -88,12 +100,33 @@ fn get_potential_paths(
         }
     } else {
         paths.push(Path::new(lib).to_path_buf());
+        paths.push(versioned_path(None, lib, "A"));
+        paths.push(versioned_path(None, lib, "B"));
+        paths.push(versioned_path(None, lib, "C"));
+        paths.push(versioned_path(None, lib, "D"));
 
         if let Some(shared_cache_root) = &shared_cache_root {
             let mut path = PathBuf::from(shared_cache_root);
-            let lib = lib.strip_prefix('/').unwrap();
-            path.push(lib);
+            let stripped = lib.strip_prefix('/').unwrap();
+            path.push(stripped);
             paths.push(path);
+
+            paths.push(versioned_path(Some(shared_cache_root.to_owned()), lib, "A"));
+            paths.push(versioned_path(Some(shared_cache_root.to_owned()), lib, "B"));
+            paths.push(versioned_path(Some(shared_cache_root.to_owned()), lib, "C"));
+            paths.push(versioned_path(Some(shared_cache_root.to_owned()), lib, "D"));
+
+            let mut ios_support_root = PathBuf::from(shared_cache_root);
+            ios_support_root.push("System/iOSSupport");
+            ios_support_root.push(lib);
+            paths.push(ios_support_root);
+
+            let mut ios_support_root = PathBuf::from(shared_cache_root);
+            ios_support_root.push("System/iOSSupport");
+            paths.push(versioned_path(Some(ios_support_root.clone()), lib, "A"));
+            paths.push(versioned_path(Some(ios_support_root.clone()), lib, "B"));
+            paths.push(versioned_path(Some(ios_support_root.clone()), lib, "C"));
+            paths.push(versioned_path(Some(ios_support_root.clone()), lib, "D"));
         }
     }
 
