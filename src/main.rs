@@ -40,7 +40,7 @@ fn main() -> Result<(), error::Error> {
         0,
         args.depth,
         &visited,
-        &args.ignore_prefixes,
+        &args.ignore_prefix,
         args.exclude_all_duplicates,
         args.verbose,
     )?;

@@ -15,7 +15,7 @@ pub struct Args {
 
     /// Exclude dylibs that start with these prefixes
     #[arg(short = 'p', long, value_name = "PREFIX")]
-    pub ignore_prefixes: Vec<String>,
+    pub ignore_prefix: Vec<String>,
 
     /// Path to the shared cache, if not provided try to discover it.
     #[arg(short, long)]
