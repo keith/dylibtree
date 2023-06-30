@@ -193,6 +193,11 @@ fn print_dylib_paths(
 }
 
 fn main() -> Result<(), error::Error> {
+    unsafe {
+        // https://github.com/rust-lang/rust/issues/46016#issuecomment-428106774
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+
     let args = cli::parse_args();
     let mut extracted_cache_path: Option<PathBuf> = None;
     if args.include_system_dependencies {
