@@ -7,8 +7,9 @@ use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 
 use crate::failf;
+use crate::verbose_log;
 
-pub fn extract_libs(shared_cache_path: Option<PathBuf>) -> PathBuf {
+pub fn extract_libs(shared_cache_path: Option<PathBuf>, verbose: bool) -> PathBuf {
     if let Some(shared_cache_path) = &shared_cache_path {
         if !shared_cache_path.exists() {
             failf!(
@@ -44,6 +45,8 @@ pub fn extract_libs(shared_cache_path: Option<PathBuf>) -> PathBuf {
     let hash_str = format!("{:x}", hasher.finish());
     output_path.push(hash_str);
 
+    verbose_log!(verbose, "Using shared cache at: {:?}", shared_cache_path);
+    verbose_log!(verbose, "Extracted shared cache to: {:?}", output_path);
     if output_path.exists() {
         return output_path;
     }

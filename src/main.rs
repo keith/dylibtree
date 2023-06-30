@@ -134,6 +134,7 @@ fn print_dylib_paths(
     let buffer = fs::read(actual_path).unwrap();
     let binary = load_binary(actual_path, &buffer).unwrap();
 
+    verbose_log!(verbose, "Visiting lib: {:?}", actual_path);
     println!("{}{}:", " ".repeat(indent), canonical_path);
     let prefix = " ".repeat(indent + 2);
     let mut visited = visited.clone();
@@ -201,7 +202,7 @@ fn main() -> Result<(), error::Error> {
     let args = cli::parse_args();
     let mut extracted_cache_path: Option<PathBuf> = None;
     if args.include_system_dependencies {
-        extracted_cache_path = Some(extract::extract_libs(args.shared_cache_path));
+        extracted_cache_path = Some(extract::extract_libs(args.shared_cache_path, args.verbose));
     }
 
     let visited = HashSet::new();
