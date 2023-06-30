@@ -149,7 +149,7 @@ fn print_dylib_paths(
             continue;
         }
 
-        if include_system_dependencies && is_system_dependency(dylib) {
+        if !include_system_dependencies && is_system_dependency(dylib) {
             verbose_log!(verbose, "Ignoring system dependency: {}", dylib);
             continue;
         }
