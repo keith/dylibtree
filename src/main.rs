@@ -132,8 +132,8 @@ fn print_dylib_paths(
     include_system_dependencies: bool,
     verbose: bool,
 ) -> Result<HashSet<String>, error::Error> {
-    let buffer = fs::read(actual_path).unwrap();
-    let binary = load_binary(actual_path, &buffer).unwrap();
+    let buffer = fs::read(actual_path)?;
+    let binary = load_binary(actual_path, &buffer)?;
 
     verbose_log!(verbose, "Visiting lib: {:?}", actual_path);
     let indent = depth * 2;
