@@ -3,7 +3,7 @@
 `dylibtree` is a tool for inspecting the dynamic dependencies of a
 Mach-O binary recursively. It can be useful to understand what library
 loads another library that you may not expect. If it helps you can think
-of `dylibtree` as a recursive `otool -L`.
+of `dylibtree` as a recursive `otool -L`, or as a Mach-O version of `lddtree`.
 
 # Usage
 
