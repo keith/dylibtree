@@ -54,20 +54,8 @@ fn load_binary<'a>(path: &Path, buffer: &'a [u8]) -> Result<goblin::mach::MachO<
     }
 }
 
-fn versioned_path(prefix: Option<PathBuf>, lib: &str, version: &str) -> PathBuf {
-    let re = regex::Regex::new(r#"[^/]+\.framework/"#).unwrap();
-    let framework_with_version = re.replace_all(lib, format!("${{0}}Versions/{}/", version));
-    if let Some(prefix) = &prefix {
-        let mut path = prefix.clone();
-        path.push(framework_with_version.strip_prefix('/').unwrap());
-        return path;
-    }
-
-    Path::new(framework_with_version.as_ref()).to_path_buf()
-}
-
 fn get_potential_paths(
-    shared_cache_root: &Option<PathBuf>,
+    shared_cache_root: &PathBuf,
     executable_path: &Path,
     lib: &str,
     rpaths: &Vec<&str>,
@@ -87,48 +75,23 @@ fn get_potential_paths(
                 continue;
             }
 
-            let mut path = PathBuf::from(rpath);
+            let mut path = PathBuf::from(shared_cache_root);
+            let stripped = rpath.strip_prefix('/').unwrap();
+            path.push(stripped);
             path.push(lib);
             paths.push(path);
 
-            if let Some(shared_cache_root) = &shared_cache_root {
-                let mut path = PathBuf::from(shared_cache_root);
-                let rpath = rpath.strip_prefix('/').unwrap();
-                path.push(rpath);
-                path.push(lib);
-                paths.push(path);
-            }
+            let mut path = PathBuf::from(rpath);
+            path.push(lib);
+            paths.push(path);
         }
     } else {
+        let mut path = PathBuf::from(shared_cache_root);
+        let stripped = lib.strip_prefix('/').unwrap();
+        path.push(stripped);
+        paths.push(path);
+
         paths.push(Path::new(lib).to_path_buf());
-        paths.push(versioned_path(None, lib, "A"));
-        paths.push(versioned_path(None, lib, "B"));
-        paths.push(versioned_path(None, lib, "C"));
-        paths.push(versioned_path(None, lib, "D"));
-
-        if let Some(shared_cache_root) = &shared_cache_root {
-            let mut path = PathBuf::from(shared_cache_root);
-            let stripped = lib.strip_prefix('/').unwrap();
-            path.push(stripped);
-            paths.push(path);
-
-            paths.push(versioned_path(Some(shared_cache_root.to_owned()), lib, "A"));
-            paths.push(versioned_path(Some(shared_cache_root.to_owned()), lib, "B"));
-            paths.push(versioned_path(Some(shared_cache_root.to_owned()), lib, "C"));
-            paths.push(versioned_path(Some(shared_cache_root.to_owned()), lib, "D"));
-
-            let mut ios_support_root = PathBuf::from(shared_cache_root);
-            ios_support_root.push("System/iOSSupport");
-            ios_support_root.push(lib);
-            paths.push(ios_support_root);
-
-            let mut ios_support_root = PathBuf::from(shared_cache_root);
-            ios_support_root.push("System/iOSSupport");
-            paths.push(versioned_path(Some(ios_support_root.clone()), lib, "A"));
-            paths.push(versioned_path(Some(ios_support_root.clone()), lib, "B"));
-            paths.push(versioned_path(Some(ios_support_root.clone()), lib, "C"));
-            paths.push(versioned_path(Some(ios_support_root.clone()), lib, "D"));
-        }
     }
 
     paths
@@ -155,7 +118,7 @@ fn is_system_dependency(lib: &str) -> bool {
 }
 
 fn print_dylib_paths(
-    shared_cache_root: &Option<PathBuf>,
+    shared_cache_root: &PathBuf,
     actual_path: &Path,
     canonical_path: &str,
     depth: usize,
@@ -338,7 +301,7 @@ fn main() -> Result<(), error::Error> {
     let visited = HashSet::new();
     verbose_log!(args.verbose, "runtime_root: {:?}", runtime_root);
     print_dylib_paths(
-        &Some(runtime_root), // TODO non optional
+        &runtime_root,
         &args.binary,
         args.binary.to_str().unwrap(),
         0,
