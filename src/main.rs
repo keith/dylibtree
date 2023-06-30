@@ -124,7 +124,8 @@ fn print_dylib_paths(
     shared_cache_root: &Option<PathBuf>,
     actual_path: &Path,
     canonical_path: &str,
-    indent: usize,
+    depth: usize,
+    max_depth: usize,
     visited: &HashSet<String>,
     ignore_prefixes: &Vec<String>,
     exclude_all_duplicates: bool,
@@ -135,6 +136,7 @@ fn print_dylib_paths(
     let binary = load_binary(actual_path, &buffer).unwrap();
 
     verbose_log!(verbose, "Visiting lib: {:?}", actual_path);
+    let indent = depth * 2;
     println!("{}{}:", " ".repeat(indent), canonical_path);
     let prefix = " ".repeat(indent + 2);
     let mut visited = visited.clone();
@@ -142,6 +144,10 @@ fn print_dylib_paths(
         // The LC_ID_DYLIB load command is contained in this list, so we need to skip the current
         // dylib to not get stuck in an infinite loop
         if dylib == "self" || dylib == canonical_path {
+            continue;
+        }
+
+        if depth + 1 > max_depth {
             continue;
         }
 
@@ -173,7 +179,8 @@ fn print_dylib_paths(
                     shared_cache_root,
                     &path,
                     dylib,
-                    indent + 2,
+                    depth + 1,
+                    max_depth,
                     &visited,
                     ignore_prefixes,
                     exclude_all_duplicates,
@@ -211,6 +218,7 @@ fn main() -> Result<(), error::Error> {
         &args.binary,
         args.binary.to_str().unwrap(),
         0,
+        args.depth,
         &visited,
         &args.ignore_prefixes,
         args.exclude_all_duplicates,

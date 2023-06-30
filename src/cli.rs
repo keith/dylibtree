@@ -27,6 +27,10 @@ pub struct Args {
     #[arg(short, long)]
     pub shared_cache_path: Option<PathBuf>,
 
+    /// The maximum depth of libraries to print. Reduce to reduce output
+    #[arg(short, long, default_value_t = 9999)]
+    pub depth: usize,
+
     /// Print verbose output for debugging dylibtree itself
     #[arg(long, default_value_t = false, hide = true)]
     pub verbose: bool,
