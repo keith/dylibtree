@@ -111,7 +111,7 @@ fn should_ignore(lib: &str, ignore_prefixes: &Vec<String>) -> bool {
 }
 
 fn is_system_dependency(lib: &str) -> bool {
-    for prefix in ["/usr/lib/", "/System"] {
+    for prefix in ["/usr/lib/", "/System", "@rpath/libswift"] {
         if lib.starts_with(prefix) {
             return true;
         }
