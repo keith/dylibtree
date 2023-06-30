@@ -107,16 +107,6 @@ fn should_ignore(lib: &str, ignore_prefixes: &Vec<String>) -> bool {
     false
 }
 
-fn is_system_dependency(lib: &str) -> bool {
-    for prefix in ["/usr/lib/", "/System", "@rpath/libswift"] {
-        if lib.starts_with(prefix) {
-            return true;
-        }
-    }
-
-    false
-}
-
 fn print_dylib_paths(
     shared_cache_root: &PathBuf,
     actual_path: &Path,
@@ -126,7 +116,6 @@ fn print_dylib_paths(
     visited: &HashSet<String>,
     ignore_prefixes: &Vec<String>,
     exclude_all_duplicates: bool,
-    include_system_dependencies: bool,
     verbose: bool,
 ) -> Result<HashSet<String>, error::Error> {
     let buffer = fs::read(actual_path)?;
@@ -153,11 +142,6 @@ fn print_dylib_paths(
             continue;
         }
 
-        if !include_system_dependencies && is_system_dependency(dylib) {
-            verbose_log!(verbose, "Ignoring system dependency: {}", dylib);
-            continue;
-        }
-
         if visited.contains(&dylib.to_owned()) {
             if !exclude_all_duplicates {
                 println!("{}{}", prefix, dylib);
@@ -181,7 +165,6 @@ fn print_dylib_paths(
                     &visited,
                     ignore_prefixes,
                     exclude_all_duplicates,
-                    include_system_dependencies,
                     verbose,
                 )?);
                 found = true;
@@ -287,8 +270,6 @@ fn main() -> Result<(), error::Error> {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL);
     }
 
-    // TODO: mabye delete include_system_dependencies
-
     let args = cli::parse_args();
     let runtime_root = if let Some(path) = args.runtime_root {
         path
@@ -309,7 +290,6 @@ fn main() -> Result<(), error::Error> {
         &visited,
         &args.ignore_prefixes,
         args.exclude_all_duplicates,
-        args.include_system_dependencies,
         args.verbose,
     )?;
     Ok(())

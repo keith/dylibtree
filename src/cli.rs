@@ -13,11 +13,6 @@ pub struct Args {
     #[arg(short, long, default_value_t = false)]
     pub exclude_all_duplicates: bool,
 
-    /// Also print all dependent dylibs from system frameworks. This requires extracting the
-    /// shared cache, and will result in a lot of output
-    #[arg(short, long, default_value_t = false)]
-    pub include_system_dependencies: bool,
-
     /// Exclude dylibs that start with these prefixes
     #[arg(short = 'p', long, value_name = "PREFIX")]
     pub ignore_prefixes: Vec<String>,
