@@ -110,6 +110,11 @@ fn get_potential_paths(
             path.push(lib);
             paths.push(path);
         }
+    } else if lib.starts_with("@executable_path/") || lib.starts_with("@loader_path/") {
+        let lib = lib.split_once('/').unwrap().1;
+        let mut path = PathBuf::from(executable_path.parent().unwrap());
+        path.push(lib);
+        paths.push(path);
     } else {
         let mut path = PathBuf::from(shared_cache_root);
         let stripped = lib.strip_prefix('/').unwrap();
