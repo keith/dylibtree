@@ -2,7 +2,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version = option_env!("DYLIBTREE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")), about, long_about = None)]
 pub struct Args {
     /// Path of the binary to print dynamic dependencies for
     #[arg(value_name = "BINARY")]
